@@ -189,7 +189,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('Musorgram'),
-            subtitle: Text('Версия 1.0.0 · клиент сообщений MusorBox'),
+            subtitle: Text('Версия 0.1.0 · клиент сообщений MusorBox'),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
