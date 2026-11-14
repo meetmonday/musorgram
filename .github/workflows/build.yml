@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full_android:
+        description: Build Android APK for arm, arm64, and x64
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -20,7 +26,7 @@ env:
 jobs:
   quality:
     name: Analyze and test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -46,7 +52,12 @@ jobs:
 
   android:
     name: Android APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_TARGET_PLATFORMS: ${{ github.event_name == 'workflow_dispatch' && inputs.full_android && 'android-arm,android-arm64,android-x64' || 'android-arm64' }}
+      # Ubuntu 24.04 runners already contain this NDK, unlike Flutter's default
+      # r28c. The project keeps using Flutter's default NDK outside CI.
+      ORG_GRADLE_PROJECT_musorgramNdkVersion: 29.0.14206865
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -71,18 +82,21 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release --no-pub
+        run: >-
+          flutter build apk --release --no-pub
+          --target-platform "$ANDROID_TARGET_PLATFORMS"
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
           name: musorgram-android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
+          compression-level: 0
 
   linux:
     name: Linux x64
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -116,3 +130,4 @@ jobs:
           name: musorgram-linux-x64
           path: musorgram-linux-x64.tar.gz
           if-no-files-found: error
+          compression-level: 0

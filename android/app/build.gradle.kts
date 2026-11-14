@@ -19,7 +19,8 @@ android {
     namespace = "icu.randomshit.musorgram"
     // Required by flutter_local_notifications 23.x.
     compileSdk = 37
-    ndkVersion = flutter.ndkVersion
+    ndkVersion =
+        providers.gradleProperty("musorgramNdkVersion").getOrElse(flutter.ndkVersion)
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

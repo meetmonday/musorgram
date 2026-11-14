@@ -49,10 +49,11 @@ flutter run -d android \
 
 ## Сборка
 
-На GitHub каждый push и pull request в `main` запускает форматирование,
-анализатор, тесты и release-сборки для Android и Linux. Готовые APK и архив
-Linux bundle можно скачать в разделе **Actions → Artifacts** соответствующего
-запуска.
+На GitHub каждый push и pull request в `main` параллельно запускает
+форматирование, анализатор, тесты и release-сборки для Android arm64 и Linux.
+Готовые APK и архив Linux bundle можно скачать в разделе **Actions →
+Artifacts** соответствующего запуска. Полный Android APK для arm, arm64 и x64
+можно собрать ручным запуском workflow **Build** с флажком `full_android`.
 
 Linux:
 
