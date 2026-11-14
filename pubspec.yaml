@@ -22,6 +22,12 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+# 2.3.x switched to JNI native assets, forcing NDK/CMake builds just to resolve
+# Android cache paths. Keep the latest platform-channel implementation until the
+# JNI path no longer adds several minutes to clean release builds.
+dependency_overrides:
+  path_provider_android: 2.2.23
+
 flutter:
   uses-material-design: true
   assets:
