@@ -1,0 +1,29 @@
+name: musorgram
+description: "Нативный клиент сообщений MusorBox для Android и Linux"
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  crypto: ^3.0.8
+  flutter_local_notifications: ^22.3.3
+  flutter_secure_storage: ^11.2.0
+  http: ^1.6.0
+  cached_network_image: ^4.0.7
+  flutter_cache_manager: ^3.5.0
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo_asset.png
+    - assets/wallpaper.png
