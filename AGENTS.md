@@ -25,4 +25,4 @@
 - SSE events are signals, not message payloads: after `message`, `read`, initial `ready`, or reconnect, fetch the relevant `updates?after=...` data. Reconnects must recover missed events.
 - Stored secure settings override `--dart-define`, which overrides process `MB_TOKEN`/`MB_BASE_URL`, which overrides the default URL. Clear stored settings when an environment override appears ignored.
 - Cache and notification failures are deliberately best-effort so missing Linux keyrings/notification daemons or corrupt caches do not block startup or messaging. Signing out clears secure settings, JSON/media caches, and notifications.
-- Android supports API 30+ and `android/app/build.gradle.kts` currently signs release builds with the debug key; a release artifact is not publication-ready until a release keystore is configured.
+- Android supports API 29+. Release builds use `android/key.properties` when present and otherwise fall back to the debug key; a debug-signed artifact is not publication-ready.

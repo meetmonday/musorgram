@@ -71,8 +71,8 @@ flutter build apk --release
 flutter build appbundle --release
 ```
 
-Минимальная поддерживаемая версия устройства — **Android 11 (API 30)**.
-Для Android необходимы SDK Platform 36, актуальные Build Tools и принятые лицензии.
+Минимальная поддерживаемая версия устройства — **Android 10 (API 29)**.
+Для Android необходимы SDK Platform 37, актуальные Build Tools и принятые лицензии.
 
 Локально и в CI APK по умолчанию подписывается временным debug-ключом. Для
 публикуемой сборки создайте upload keystore, скопируйте

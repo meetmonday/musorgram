@@ -17,7 +17,8 @@ if (hasReleaseSigning) {
 
 android {
     namespace = "icu.randomshit.musorgram"
-    compileSdk = flutter.compileSdkVersion
+    // Required by flutter_local_notifications 23.x.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -31,8 +32,8 @@ android {
         applicationId = "icu.randomshit.musorgram"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // Android 11 is the oldest supported release.
-        minSdk = 30
+        // Android 10 is the oldest supported release.
+        minSdk = 29
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
