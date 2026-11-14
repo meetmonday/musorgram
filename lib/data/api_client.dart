@@ -16,6 +16,80 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+class AuthApiClient {
+  AuthApiClient({required String baseUrl, http.Client? httpClient})
+    : baseUrl = baseUrl.trim().replaceFirst(RegExp(r'/+$'), ''),
+      _httpClient = httpClient ?? http.Client();
+
+  final String baseUrl;
+  final http.Client _httpClient;
+
+  Future<String> login({
+    required String username,
+    required String password,
+  }) async {
+    final Uri uri;
+    try {
+      uri = Uri.parse('$baseUrl/api/auth/login');
+    } on FormatException {
+      throw const ApiException('Некорректный адрес сервера');
+    }
+    late http.Response response;
+    try {
+      response = await _httpClient
+          .post(
+            uri,
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Content-Type': 'application/json; charset=utf-8',
+              'User-Agent': 'Musorgram/1.0 Flutter',
+            },
+            body: jsonEncode(<String, String>{
+              'username': username,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw const ApiException('Сервер не ответил вовремя');
+    } on http.ClientException {
+      throw const ApiException('Не удалось связаться с MusorBox');
+    } on Object {
+      throw const ApiException('Не удалось связаться с MusorBox');
+    }
+
+    Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        throw const ApiException('MusorBox вернул некорректный ответ');
+      }
+    }
+    final JsonMap? data = decoded is Map
+        ? Map<String, dynamic>.from(decoded)
+        : null;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final String message = data?['error']?.toString().trim() ?? '';
+      throw ApiException(
+        message.isNotEmpty
+            ? message
+            : 'Ошибка сервера (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    }
+    final String token = data?['token']?.toString().trim() ?? '';
+    if (data?['ok'] != true || token.isEmpty) {
+      throw const ApiException('MusorBox не вернул токен приложения');
+    }
+    return token;
+  }
+
+  void close() {
+    _httpClient.close();
+  }
+}
+
 class ApiClient {
   ApiClient({
     required String baseUrl,
@@ -171,6 +245,10 @@ class ApiClient {
       throw const ApiException('Сервер не вернул номер группы');
     }
     return groupId;
+  }
+
+  Future<void> revokeCurrentToken() async {
+    await request('DELETE', '/api/auth/token');
   }
 
   void close() {

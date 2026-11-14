@@ -50,41 +50,94 @@ class _MusorgramAppState extends State<MusorgramApp> {
     });
   }
 
-  Future<String?> _connect(AppSettings rawSettings) async {
-    final AppSettings settings = rawSettings.normalized();
-    final Uri? baseUri = Uri.tryParse(settings.baseUrl);
+  Future<String?> _login(LoginCredentials rawCredentials) async {
+    final LoginCredentials credentials = rawCredentials.normalized();
+    final Uri? baseUri = Uri.tryParse(credentials.baseUrl);
     if (baseUri == null ||
         !<String>{'http', 'https'}.contains(baseUri.scheme) ||
         baseUri.host.isEmpty) {
       return 'Адрес должен начинаться с https:// или http://';
     }
-    if (settings.token.isEmpty) {
-      return 'Введите API-токен';
+    if (credentials.username.isEmpty) {
+      return 'Введите логин';
+    }
+    if (credentials.password.isEmpty) {
+      return 'Введите пароль';
     }
 
-    final ApiClient api = ApiClient(
-      baseUrl: settings.baseUrl,
-      token: settings.token,
-    );
+    final AuthApiClient auth = AuthApiClient(baseUrl: credentials.baseUrl);
+    ApiClient? api;
+    bool settingsSaved = false;
     try {
+      final String token = await auth.login(
+        username: credentials.username,
+        password: credentials.password,
+      );
+      final AppSettings settings = AppSettings(
+        baseUrl: credentials.baseUrl,
+        token: token,
+      ).normalized();
+      api = ApiClient(baseUrl: settings.baseUrl, token: settings.token);
       await api.getMe();
       await widget.settingsStore.save(settings);
+      settingsSaved = true;
+      final AppSettings? previous = _settings;
+      if (previous != null &&
+          previous.isConfigured &&
+          (previous.baseUrl != settings.baseUrl ||
+              previous.token != settings.token)) {
+        final ApiClient previousApi = ApiClient(
+          baseUrl: previous.baseUrl,
+          token: previous.token,
+        );
+        try {
+          await previousApi.revokeCurrentToken().timeout(
+            const Duration(seconds: 5),
+          );
+        } on Object {
+          // The new login is valid even if the old server cannot be reached.
+        } finally {
+          previousApi.close();
+        }
+      }
+      if (!mounted) {
+        return null;
+      }
+      setState(() {
+        _settings = settings;
+        _editingSettings = false;
+      });
     } on Object catch (error) {
+      if (!settingsSaved && api != null) {
+        try {
+          await api.revokeCurrentToken();
+        } on Object {
+          // The server also limits old application tokens per account.
+        }
+      }
       return error.toString();
     } finally {
-      api.close();
+      api?.close();
+      auth.close();
     }
-    if (!mounted) {
-      return null;
-    }
-    setState(() {
-      _settings = settings;
-      _editingSettings = false;
-    });
     return null;
   }
 
   Future<void> _forgetToken() async {
+    final AppSettings? settings = _settings;
+    if (settings != null && settings.isConfigured) {
+      final ApiClient api = ApiClient(
+        baseUrl: settings.baseUrl,
+        token: settings.token,
+      );
+      try {
+        await api.revokeCurrentToken().timeout(const Duration(seconds: 5));
+      } on Object {
+        // Signing out locally must also work while the server is unavailable.
+      } finally {
+        api.close();
+      }
+    }
     try {
       await widget.settingsStore.clear();
     } on Object {
@@ -111,11 +164,11 @@ class _MusorgramAppState extends State<MusorgramApp> {
       home = ConnectionPage(
         initialSettings: settings,
         canCancel: settings.isConfigured,
-        onConnect: _connect,
+        onLogin: _login,
         onCancel: settings.isConfigured
             ? () => setState(() => _editingSettings = false)
             : null,
-        onForgetToken: settings.isConfigured ? _forgetToken : null,
+        onLogout: settings.isConfigured ? _forgetToken : null,
       );
     } else {
       home = MusorgramHome(

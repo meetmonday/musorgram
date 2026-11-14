@@ -145,9 +145,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.key_outlined),
-            title: const Text('Сервер и API-токен'),
-            subtitle: const Text('Изменить параметры подключения'),
+            leading: const Icon(Icons.manage_accounts_outlined),
+            title: const Text('Сервер и аккаунт'),
+            subtitle: const Text('Сменить сервер или войти другим аккаунтом'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _editConnection,
           ),

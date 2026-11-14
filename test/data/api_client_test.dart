@@ -8,6 +8,37 @@ import 'package:http/testing.dart';
 import 'package:musorgram/data/api_client.dart';
 
 void main() {
+  test('logs in without authorization header and returns app token', () async {
+    late http.Request sentRequest;
+    final AuthApiClient auth = AuthApiClient(
+      baseUrl: 'https://example.test',
+      httpClient: MockClient((http.Request request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode(<String, Object>{
+            'ok': true,
+            'token': 'app-token',
+            'tokenType': 'Bearer',
+          }),
+          201,
+        );
+      }),
+    );
+
+    expect(
+      await auth.login(username: 'Reader', password: 'secret'),
+      'app-token',
+    );
+    expect(sentRequest.method, 'POST');
+    expect(sentRequest.url.path, '/api/auth/login');
+    expect(sentRequest.headers.containsKey('Authorization'), isFalse);
+    expect(jsonDecode(sentRequest.body), <String, Object>{
+      'username': 'Reader',
+      'password': 'secret',
+    });
+    auth.close();
+  });
+
   test('sends bearer token and decodes a successful response', () async {
     final ApiClient api = ApiClient(
       baseUrl: 'https://example.test',
@@ -119,6 +150,24 @@ void main() {
     expect(sentRequest.method, 'POST');
     expect(sentRequest.url.path, '/api/messages/groups/join');
     expect(jsonDecode(sentRequest.body), <String, Object>{'token': 'invite'});
+    api.close();
+  });
+
+  test('revokes the current application token', () async {
+    late http.Request sentRequest;
+    final ApiClient api = ApiClient(
+      baseUrl: 'https://example.test',
+      token: 'secret-token',
+      httpClient: MockClient((http.Request request) async {
+        sentRequest = request;
+        return http.Response(jsonEncode(<String, Object>{'ok': true}), 200);
+      }),
+    );
+
+    await api.revokeCurrentToken();
+    expect(sentRequest.method, 'DELETE');
+    expect(sentRequest.url.path, '/api/auth/token');
+    expect(sentRequest.headers['Authorization'], 'Bearer secret-token');
     api.close();
   });
 

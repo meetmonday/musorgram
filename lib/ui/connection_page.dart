@@ -4,23 +4,43 @@ import '../core/app_theme.dart';
 import '../data/settings_store.dart';
 import 'widgets/wallpaper.dart';
 
-typedef ConnectCallback = Future<String?> Function(AppSettings settings);
+class LoginCredentials {
+  const LoginCredentials({
+    required this.baseUrl,
+    required this.username,
+    required this.password,
+  });
+
+  final String baseUrl;
+  final String username;
+  final String password;
+
+  LoginCredentials normalized() {
+    return LoginCredentials(
+      baseUrl: baseUrl.trim().replaceFirst(RegExp(r'/+$'), ''),
+      username: username.trim(),
+      password: password,
+    );
+  }
+}
+
+typedef LoginCallback = Future<String?> Function(LoginCredentials credentials);
 
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({
     required this.initialSettings,
     required this.canCancel,
-    required this.onConnect,
+    required this.onLogin,
     this.onCancel,
-    this.onForgetToken,
+    this.onLogout,
     super.key,
   });
 
   final AppSettings initialSettings;
   final bool canCancel;
-  final ConnectCallback onConnect;
+  final LoginCallback onLogin;
   final VoidCallback? onCancel;
-  final Future<void> Function()? onForgetToken;
+  final Future<void> Function()? onLogout;
 
   @override
   State<ConnectionPage> createState() => _ConnectionPageState();
@@ -28,9 +48,11 @@ class ConnectionPage extends StatefulWidget {
 
 class _ConnectionPageState extends State<ConnectionPage> {
   late final TextEditingController _baseUrlController;
-  late final TextEditingController _tokenController;
-  final FocusNode _tokenFocus = FocusNode();
-  bool _obscureToken = true;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
+  final FocusNode _usernameFocus = FocusNode();
+  final FocusNode _passwordFocus = FocusNode();
+  bool _obscurePassword = true;
   bool _submitting = false;
   String? _error;
 
@@ -40,16 +62,17 @@ class _ConnectionPageState extends State<ConnectionPage> {
     _baseUrlController = TextEditingController(
       text: widget.initialSettings.baseUrl,
     );
-    _tokenController = TextEditingController(
-      text: widget.initialSettings.token,
-    );
+    _usernameController = TextEditingController();
+    _passwordController = TextEditingController();
   }
 
   @override
   void dispose() {
     _baseUrlController.dispose();
-    _tokenController.dispose();
-    _tokenFocus.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _usernameFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -61,10 +84,11 @@ class _ConnectionPageState extends State<ConnectionPage> {
       _submitting = true;
       _error = null;
     });
-    final String? error = await widget.onConnect(
-      AppSettings(
+    final String? error = await widget.onLogin(
+      LoginCredentials(
         baseUrl: _baseUrlController.text,
-        token: _tokenController.text,
+        username: _usernameController.text,
+        password: _passwordController.text,
       ),
     );
     if (!mounted) {
@@ -138,7 +162,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                             Text(
-                              'Подключение',
+                              'Вход',
                               style: TextStyle(
                                 color: colors.onSurface,
                                 fontSize: 16,
@@ -147,9 +171,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Токен можно создать в настройках профиля '
-                              'MusorBox. Он хранится в системном защищённом '
-                              'хранилище устройства.',
+                              'Используйте логин и пароль от MusorBox. Пароль '
+                              'не сохраняется: сервер выдаст отдельный токен '
+                              'для этого приложения.',
                               style: TextStyle(
                                 color: colors.onSurfaceVariant,
                                 fontSize: 12,
@@ -162,7 +186,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                               enabled: !_submitting,
                               keyboardType: TextInputType.url,
                               textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => _tokenFocus.requestFocus(),
+                              onSubmitted: (_) => _usernameFocus.requestFocus(),
                               decoration: const InputDecoration(
                                 labelText: 'Адрес MusorBox',
                                 hintText: defaultBaseUrl,
@@ -171,29 +195,52 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             ),
                             const SizedBox(height: 15),
                             TextField(
-                              controller: _tokenController,
-                              focusNode: _tokenFocus,
+                              controller: _usernameController,
+                              focusNode: _usernameFocus,
                               enabled: !_submitting,
-                              obscureText: _obscureToken,
                               enableSuggestions: false,
                               autocorrect: false,
+                              autofillHints: const <String>[
+                                AutofillHints.username,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => _passwordFocus.requestFocus(),
+                              decoration: const InputDecoration(
+                                labelText: 'Логин',
+                                prefixIcon: Icon(
+                                  Icons.person_outline,
+                                  size: 19,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                            TextField(
+                              controller: _passwordController,
+                              focusNode: _passwordFocus,
+                              enabled: !_submitting,
+                              obscureText: _obscurePassword,
+                              enableSuggestions: false,
+                              autocorrect: false,
+                              autofillHints: const <String>[
+                                AutofillHints.password,
+                              ],
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) => _submit(),
                               decoration: InputDecoration(
-                                labelText: 'API-токен',
+                                labelText: 'Пароль',
                                 prefixIcon: const Icon(
-                                  Icons.key_rounded,
+                                  Icons.lock_outline,
                                   size: 19,
                                 ),
                                 suffixIcon: IconButton(
-                                  tooltip: _obscureToken
-                                      ? 'Показать токен'
-                                      : 'Скрыть токен',
+                                  tooltip: _obscurePassword
+                                      ? 'Показать пароль'
+                                      : 'Скрыть пароль',
                                   onPressed: () => setState(() {
-                                    _obscureToken = !_obscureToken;
+                                    _obscurePassword = !_obscurePassword;
                                   }),
                                   icon: Icon(
-                                    _obscureToken
+                                    _obscurePassword
                                         ? Icons.visibility_outlined
                                         : Icons.visibility_off_outlined,
                                     size: 19,
@@ -238,7 +285,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                                         ),
                                       )
                                     : const Text(
-                                        'ПОДКЛЮЧИТЬСЯ',
+                                        'ВОЙТИ',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
@@ -253,16 +300,16 @@ class _ConnectionPageState extends State<ConnectionPage> {
                                 child: const Text('Отмена'),
                               ),
                             ],
-                            if (widget.onForgetToken != null) ...<Widget>[
+                            if (widget.onLogout != null) ...<Widget>[
                               const Divider(height: 26),
                               TextButton(
                                 onPressed: _submitting
                                     ? null
-                                    : () => widget.onForgetToken!(),
+                                    : () => widget.onLogout!(),
                                 style: TextButton.styleFrom(
                                   foregroundColor: colors.error,
                                 ),
-                                child: const Text('Удалить сохранённый токен'),
+                                child: const Text('Выйти из аккаунта'),
                               ),
                             ],
                           ],

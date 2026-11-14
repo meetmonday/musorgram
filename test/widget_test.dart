@@ -5,10 +5,10 @@ import 'package:musorgram/data/settings_store.dart';
 import 'package:musorgram/ui/connection_page.dart';
 
 void main() {
-  testWidgets('connection screen submits entered token', (
+  testWidgets('connection screen submits entered credentials', (
     WidgetTester tester,
   ) async {
-    AppSettings? submitted;
+    LoginCredentials? submitted;
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
@@ -18,22 +18,21 @@ void main() {
             token: '',
           ),
           canCancel: false,
-          onConnect: (AppSettings settings) async {
-            submitted = settings;
+          onLogin: (LoginCredentials credentials) async {
+            submitted = credentials;
             return null;
           },
         ),
       ),
     );
 
-    await tester.enterText(
-      find.widgetWithText(TextField, 'API-токен'),
-      'test-token',
-    );
-    await tester.tap(find.text('ПОДКЛЮЧИТЬСЯ'));
+    await tester.enterText(find.widgetWithText(TextField, 'Логин'), 'Reader');
+    await tester.enterText(find.widgetWithText(TextField, 'Пароль'), 'secret');
+    await tester.tap(find.text('ВОЙТИ'));
     await tester.pump();
 
-    expect(submitted?.token, 'test-token');
+    expect(submitted?.username, 'Reader');
+    expect(submitted?.password, 'secret');
     expect(submitted?.baseUrl, defaultBaseUrl);
   });
 }
