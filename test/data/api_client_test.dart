@@ -219,4 +219,49 @@ void main() {
       await server.close(force: true);
     }
   });
+
+  test('keeps SSE reported connected during a brief reconnect', () async {
+    final HttpServer server = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    int requests = 0;
+    final Completer<void> secondResponseSent = Completer<void>();
+    server.listen((HttpRequest request) async {
+      requests += 1;
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        )
+        ..write('event: ready\ndata:\n\n');
+      await request.response.flush();
+      if (requests == 1) {
+        await request.response.close();
+      } else if (!secondResponseSent.isCompleted) {
+        secondResponseSent.complete();
+      }
+    });
+
+    final List<bool> states = <bool>[];
+    late final SseConnection connection;
+    connection = SseConnection(
+      baseUrl: 'http://${server.address.address}:${server.port}',
+      token: 'test-token',
+      onState: states.add,
+      onEvent: (_, _) {},
+      onError: (_) {},
+    )..start();
+
+    try {
+      await secondResponseSent.future.timeout(const Duration(seconds: 5));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(states, <bool>[true]);
+    } finally {
+      connection.close();
+      await server.close(force: true);
+    }
+  });
 }

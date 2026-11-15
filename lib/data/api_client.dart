@@ -277,8 +277,13 @@ class SseConnection {
   final SseEventCallback onEvent;
   final SseErrorCallback onError;
 
+  static const Duration _reconnectDelay = Duration(seconds: 3);
+  static const Duration _disconnectGrace = Duration(seconds: 5);
+
   bool _closed = false;
+  bool _reportedConnected = false;
   http.Client? _activeClient;
+  Timer? _disconnectTimer;
 
   void start() {
     unawaited(_run());
@@ -319,7 +324,7 @@ class SseConnection {
           reportedAuthorizationError = response.statusCode == 401;
         } else {
           reportedAuthorizationError = false;
-          onState(true);
+          _markConnected();
           await _readEvents(response);
         }
       } on TimeoutException {
@@ -335,13 +340,41 @@ class SseConnection {
         if (identical(_activeClient, client)) {
           _activeClient = null;
         }
-        onState(false);
+        _scheduleDisconnected();
       }
 
       if (!_closed) {
-        await Future<void>.delayed(const Duration(seconds: 3));
+        await Future<void>.delayed(_reconnectDelay);
       }
     }
+  }
+
+  void _markConnected() {
+    _disconnectTimer?.cancel();
+    _disconnectTimer = null;
+    if (_closed || _reportedConnected) {
+      return;
+    }
+    _reportedConnected = true;
+    onState(true);
+  }
+
+  void _scheduleDisconnected() {
+    if (_closed || !_reportedConnected || _disconnectTimer != null) {
+      return;
+    }
+    _disconnectTimer = Timer(_disconnectGrace, () {
+      _disconnectTimer = null;
+      _markDisconnected();
+    });
+  }
+
+  void _markDisconnected() {
+    if (!_reportedConnected) {
+      return;
+    }
+    _reportedConnected = false;
+    onState(false);
   }
 
   Future<void> _readEvents(http.StreamedResponse response) async {
@@ -387,8 +420,14 @@ class SseConnection {
   }
 
   void close() {
+    if (_closed) {
+      return;
+    }
     _closed = true;
+    _disconnectTimer?.cancel();
+    _disconnectTimer = null;
     _activeClient?.close();
     _activeClient = null;
+    _markDisconnected();
   }
 }
