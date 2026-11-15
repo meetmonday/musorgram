@@ -63,4 +63,50 @@ void main() {
     expect(thread.hasOlder, isTrue);
     expect(thread.olderBefore, 10);
   });
+
+  test('parses an image album and uses its caption as preview', () {
+    final MessageItem message = MessageItem.fromJson(<String, dynamic>{
+      'id': 15,
+      'senderId': 7,
+      'body': 'Две фотографии',
+      'images': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'id': 31,
+          'url': '/api/messages/media/31',
+          'thumbnailUrl': '/api/messages/media/31?size=thumb',
+          'width': 1600,
+          'height': 900,
+          'mimeType': 'image/jpeg',
+          'sizeBytes': 120000,
+        },
+        <String, dynamic>{
+          'id': 32,
+          'url': '/api/messages/media/32',
+          'width': 800,
+          'height': 800,
+          'mimeType': 'image/png',
+          'sizeBytes': 240000,
+        },
+      ],
+    });
+
+    expect(message.images, hasLength(2));
+    expect(message.images.first.id, 31);
+    expect(message.images.first.width, 1600);
+    expect(message.images.first.previewUrl, contains('size=thumb'));
+    expect(message.previewText, 'Две фотографии');
+  });
+
+  test('uses a photo label when an image message has no caption', () {
+    final MessageItem message = MessageItem.fromJson(<String, dynamic>{
+      'id': 16,
+      'senderId': 7,
+      'body': '',
+      'images': <Map<String, dynamic>>[
+        <String, dynamic>{'id': 33, 'url': '/api/messages/media/33'},
+      ],
+    });
+
+    expect(message.previewText, 'Фотография');
+  });
 }

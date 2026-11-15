@@ -386,10 +386,37 @@ class MusorgramController extends ChangeNotifier {
     }
   }
 
-  Future<bool> sendMessage(String rawBody) async {
+  Future<bool> sendMessage(
+    String rawBody, {
+    List<OutgoingImage> images = const <OutgoingImage>[],
+  }) async {
     final ConversationTarget? selected = _current;
     final String body = rawBody.trim();
-    if (selected == null || body.isEmpty || _chatLoading) {
+    if (selected == null || (body.isEmpty && images.isEmpty) || _chatLoading) {
+      return false;
+    }
+    if (body.runes.length > 4000) {
+      _showError('Подпись должна содержать не больше 4000 символов');
+      return false;
+    }
+    if (images.length > maxMessageImages) {
+      _showError('К одному сообщению можно прикрепить до 10 изображений');
+      return false;
+    }
+    final int totalImageBytes = images.fold<int>(
+      0,
+      (int total, OutgoingImage image) => total + image.sizeBytes,
+    );
+    if (images.any(
+      (OutgoingImage image) =>
+          image.sizeBytes > maxMessageImageBytes ||
+          !supportedMessageImageTypes.contains(image.mimeType),
+    )) {
+      _showError('Выберите JPEG, PNG, WebP или GIF размером до 20 МБ');
+      return false;
+    }
+    if (totalImageBytes > maxMessageImagesTotalBytes) {
+      _showError('Общий размер изображений не должен превышать 50 МБ');
       return false;
     }
     final int generation = _chatGeneration;
@@ -404,6 +431,7 @@ class MusorgramController extends ChangeNotifier {
       createdAt: DateTime.now().toUtc().toIso8601String(),
       readAt: null,
       own: true,
+      images: images.map(MessageImage.pending).toList(growable: false),
       pending: true,
     );
     _messages = <MessageItem>[..._messages, pending];
@@ -414,10 +442,10 @@ class MusorgramController extends ChangeNotifier {
               '${Uri.encodeComponent(selected.address.stringIdentifier)}'
         : '/api/messages/groups/${selected.address.groupId}/messages';
     try {
-      final JsonMap data = await api.request(
-        'POST',
-        path,
-        payload: <String, dynamic>{'body': body},
+      final JsonMap data = await api.sendMessage(
+        path: path,
+        body: body,
+        images: images,
       );
       if (_disposed) {
         return true;
@@ -434,11 +462,13 @@ class MusorgramController extends ChangeNotifier {
         Map<String, dynamic>.from(messageValue),
         ownUserId: _me?.id,
       ).copyWith(own: true, pending: false);
-      _messages = _messages
-          .map(
-            (MessageItem message) => message.id == pendingId ? sent : message,
-          )
-          .toList(growable: true);
+      _messages = <MessageItem>[
+        for (final MessageItem message in _messages)
+          if (message.id == pendingId)
+            sent
+          else if (message.id != sent.id)
+            message,
+      ];
       _notify();
       unawaited(refreshChats());
       return true;
@@ -591,6 +621,10 @@ class MusorgramController extends ChangeNotifier {
       _errorMessage = null;
       _notify();
     }
+  }
+
+  void showError(String message) {
+    _showError(message);
   }
 
   void _onEvent(String name, JsonMap _) {

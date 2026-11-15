@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../data/json_cache_store.dart';
@@ -9,6 +12,10 @@ final CacheManager mediaCacheManager = CacheManager(
     maxNrOfCacheObjects: 500,
   ),
 );
+
+String authenticatedMediaCacheKey(String url, String token) {
+  return sha256.convert(utf8.encode('$url\u0000$token')).toString();
+}
 
 Future<void> clearApplicationCaches() async {
   await Future.wait<void>(<Future<void>>[

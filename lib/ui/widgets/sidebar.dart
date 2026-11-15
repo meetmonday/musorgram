@@ -41,7 +41,7 @@ class ChatSidebar extends StatelessWidget {
           final String haystack = <String>[
             chat.displayName,
             chat.partner?.username ?? '',
-            last?.body ?? '',
+            last?.previewText ?? '',
           ].join(' ').toLowerCase();
           return haystack.contains(query);
         })
@@ -316,7 +316,7 @@ class ChatListRow extends StatelessWidget {
     final ColorScheme colors = theme.colorScheme;
     final AppPalette palette = context.appPalette;
     final MessageItem? last = chat.lastMessage;
-    String preview = last?.body.replaceAll('\n', ' ') ?? 'Нет сообщений';
+    String preview = last?.previewText ?? 'Нет сообщений';
     final bool own =
         last != null &&
         (last.own || (ownUserId != null && last.senderId == ownUserId));

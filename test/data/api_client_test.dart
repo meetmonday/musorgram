@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:musorgram/data/api_client.dart';
+import 'package:musorgram/data/models.dart';
 
 void main() {
   test('logs in without authorization header and returns app token', () async {
@@ -151,6 +152,81 @@ void main() {
     expect(sentRequest.url.path, '/api/messages/groups/join');
     expect(jsonDecode(sentRequest.body), <String, Object>{'token': 'invite'});
     api.close();
+  });
+
+  test('sends multiple images and one caption as multipart', () async {
+    final Directory temporary = await Directory.systemTemp.createTemp(
+      'musorgram-images-',
+    );
+    final File first = File('${temporary.path}/first.jpg');
+    final File second = File('${temporary.path}/second.png');
+    await first.writeAsBytes(<int>[0xff, 0xd8, 0xff, 0xd9]);
+    await second.writeAsBytes(<int>[0x89, 0x50, 0x4e, 0x47]);
+
+    late http.Request sentRequest;
+    final ApiClient api = ApiClient(
+      baseUrl: 'https://example.test',
+      token: 'secret-token',
+      httpClient: MockClient((http.Request request) async {
+        sentRequest = request;
+        return http.Response(
+          jsonEncode(<String, Object>{
+            'ok': true,
+            'message': <String, Object>{
+              'id': 51,
+              'senderId': 7,
+              'body': 'Общая подпись',
+              'images': <Object>[],
+            },
+          }),
+          201,
+          headers: <String, String>{
+            'content-type': 'application/json; charset=utf-8',
+          },
+        );
+      }),
+    );
+
+    try {
+      await api.sendMessage(
+        path: '/api/messages/direct/Reader',
+        body: 'Общая подпись',
+        images: <OutgoingImage>[
+          OutgoingImage(
+            path: first.path,
+            name: 'first.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: await first.length(),
+          ),
+          OutgoingImage(
+            path: second.path,
+            name: 'second.png',
+            mimeType: 'image/png',
+            sizeBytes: await second.length(),
+          ),
+        ],
+      );
+
+      final String multipart = utf8.decode(
+        sentRequest.bodyBytes,
+        allowMalformed: true,
+      );
+      expect(sentRequest.method, 'POST');
+      expect(sentRequest.url.path, '/api/messages/direct/Reader');
+      expect(sentRequest.headers['Authorization'], 'Bearer secret-token');
+      expect(
+        sentRequest.headers['content-type'],
+        startsWith('multipart/form-data'),
+      );
+      expect(multipart, contains('name="body"'));
+      expect(multipart, contains('Общая подпись'));
+      expect(RegExp('name="images"').allMatches(multipart), hasLength(2));
+      expect(multipart, contains('filename="first.jpg"'));
+      expect(multipart, contains('filename="second.png"'));
+    } finally {
+      api.close();
+      await temporary.delete(recursive: true);
+    }
   });
 
   test('revokes the current application token', () async {

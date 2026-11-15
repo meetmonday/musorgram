@@ -1,5 +1,15 @@
 typedef JsonMap = Map<String, dynamic>;
 
+const int maxMessageImages = 10;
+const int maxMessageImageBytes = 20 * 1024 * 1024;
+const int maxMessageImagesTotalBytes = 50 * 1024 * 1024;
+const Set<String> supportedMessageImageTypes = <String>{
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+};
+
 int? jsonInt(Object? value) {
   if (value is int) {
     return value;
@@ -66,6 +76,7 @@ class MessageItem {
     required this.createdAt,
     required this.readAt,
     required this.own,
+    this.images = const <MessageImage>[],
     this.pending = false,
   });
 
@@ -81,6 +92,9 @@ class MessageItem {
       createdAt: _nullableString(json['createdAt']),
       readAt: _nullableString(json['readAt']),
       own: json['own'] == true || (ownUserId != null && senderId == ownUserId),
+      images: _jsonMaps(json['images'])
+          .map(MessageImage.fromJson)
+          .toList(growable: false),
       pending: json['_pending'] == true,
     );
   }
@@ -94,7 +108,24 @@ class MessageItem {
   final String? createdAt;
   final String? readAt;
   final bool own;
+  final List<MessageImage> images;
   final bool pending;
+
+  bool get hasImages => images.isNotEmpty;
+
+  String get previewText {
+    final String caption = body.trim().replaceAll('\n', ' ');
+    if (caption.isNotEmpty) {
+      return caption;
+    }
+    if (images.length == 1) {
+      return 'Фотография';
+    }
+    if (images.isNotEmpty) {
+      return '${images.length} фото';
+    }
+    return '';
+  }
 
   String get authorName {
     if (senderUsername.isNotEmpty) {
@@ -115,9 +146,73 @@ class MessageItem {
       createdAt: createdAt,
       readAt: readAt,
       own: own ?? this.own,
+      images: images,
       pending: pending ?? this.pending,
     );
   }
+}
+
+class MessageImage {
+  const MessageImage({
+    required this.id,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.width,
+    required this.height,
+    required this.mimeType,
+    required this.sizeBytes,
+    this.localPath,
+  });
+
+  factory MessageImage.fromJson(JsonMap json) {
+    return MessageImage(
+      id: jsonInt(json['id']),
+      url: (json['url'] ?? '').toString(),
+      thumbnailUrl: _nullableString(json['thumbnailUrl']),
+      width: jsonInt(json['width']),
+      height: jsonInt(json['height']),
+      mimeType: _nullableString(json['mimeType']),
+      sizeBytes: jsonInt(json['sizeBytes']),
+    );
+  }
+
+  factory MessageImage.pending(OutgoingImage image) {
+    return MessageImage(
+      id: null,
+      url: '',
+      thumbnailUrl: null,
+      width: null,
+      height: null,
+      mimeType: image.mimeType,
+      sizeBytes: image.sizeBytes,
+      localPath: image.path,
+    );
+  }
+
+  final int? id;
+  final String url;
+  final String? thumbnailUrl;
+  final int? width;
+  final int? height;
+  final String? mimeType;
+  final int? sizeBytes;
+  final String? localPath;
+
+  String get previewUrl => thumbnailUrl ?? url;
+}
+
+class OutgoingImage {
+  const OutgoingImage({
+    required this.path,
+    required this.name,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  final String path;
+  final String name;
+  final String mimeType;
+  final int sizeBytes;
 }
 
 class ChatSummary {

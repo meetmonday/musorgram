@@ -93,7 +93,7 @@ class LocalNotificationService implements AppNotificationService {
     if (chat.unreadCount > 1) {
       title = '$title · ${chat.unreadCount} непрочитанных';
     }
-    String body = chat.lastMessage!.body.replaceAll('\n', ' ');
+    String body = chat.lastMessage!.previewText;
     if (chat.kind == ChatKind.group) {
       final String sender = chat.lastMessage!.senderName?.trim() ?? '';
       if (sender.isNotEmpty) {

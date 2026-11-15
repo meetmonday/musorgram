@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'json_cache_store.dart';
 import 'models.dart';
@@ -245,6 +246,88 @@ class ApiClient {
       throw const ApiException('Сервер не вернул номер группы');
     }
     return groupId;
+  }
+
+  Future<JsonMap> sendMessage({
+    required String path,
+    required String body,
+    required List<OutgoingImage> images,
+  }) async {
+    if (images.isEmpty) {
+      return request('POST', path, payload: <String, dynamic>{'body': body});
+    }
+
+    final Uri uri;
+    try {
+      uri = Uri.parse('$baseUrl$path');
+    } on FormatException {
+      throw const ApiException('Некорректный адрес сервера');
+    }
+
+    final http.MultipartRequest upload = http.MultipartRequest('POST', uri)
+      ..headers.addAll(<String, String>{
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+        'User-Agent': 'Musorgram/1.0 Flutter',
+      });
+    if (body.isNotEmpty) {
+      upload.fields['body'] = body;
+    }
+    try {
+      for (final OutgoingImage image in images) {
+        upload.files.add(
+          await http.MultipartFile.fromPath(
+            'images',
+            image.path,
+            filename: image.name,
+            contentType: MediaType.parse(image.mimeType),
+          ),
+        );
+      }
+    } on Object {
+      throw const ApiException('Не удалось прочитать выбранное изображение');
+    }
+
+    late http.StreamedResponse response;
+    String raw = '';
+    try {
+      response = await _httpClient
+          .send(upload)
+          .timeout(const Duration(seconds: 60));
+      raw = await response.stream.bytesToString().timeout(
+        const Duration(seconds: 30),
+      );
+    } on TimeoutException {
+      throw const ApiException('Сервер не ответил вовремя');
+    } on http.ClientException {
+      throw const ApiException('Не удалось связаться с MusorBox');
+    }
+
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        throw const ApiException('MusorBox вернул некорректный ответ');
+      }
+    }
+    final JsonMap? data = decoded is Map
+        ? Map<String, dynamic>.from(decoded)
+        : null;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final String message = data?['error']?.toString().trim() ?? '';
+      throw ApiException(
+        message.isNotEmpty
+            ? message
+            : 'Ошибка сервера (${response.statusCode})',
+        statusCode: response.statusCode,
+      );
+    }
+    if (data == null || data['ok'] != true) {
+      final String message = data?['error']?.toString().trim() ?? '';
+      throw ApiException(message.isNotEmpty ? message : 'Запрос не выполнен');
+    }
+    return data;
   }
 
   Future<void> revokeCurrentToken() async {
